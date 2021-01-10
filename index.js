@@ -1,4 +1,5 @@
 const Binance = require('binance-api-node').default;
+const fs = require('fs');
 
 class TradingBot {
 
@@ -22,13 +23,24 @@ class TradingBot {
             apiSecret: apiSecret,
         })
         this.setLimits()
+        fs.writeFile('coinLog.txt','',() => { console.log('Creating log file ...')})
     }
 
     subscribe () {
         this.client.ws.ticker(this.coin, async ticker => {
 
             let price = Number.parseFloat(ticker.curDayClose)
+            
+            fs.appendFile('coinLog.txt',JSON.stringify(ticker) +"\n", () => {})
 
+            console.clear();
+            console.log(`\x1b[34m${Date.now()} -\x1b[37m ${this.coin} at ${price} `)
+            
+            if ( this.bought )
+                console.log(`\x1b[34m${Date.now()} -\x1b[37m Buying order set at ${this.startPrice} `)
+            if ( this.sold)
+                console.log(`\x1b[34m${Date.now()} -\x1b[37m Selling order set at ${this.limit.stopProfit} or  ${this.limit.stopLoss} `)
+        
 
             if (!this.bought && price > 0) {
                 let qty = ( this.usd / (price * 1.01).toFixed(this.minPrice)  ).toFixed(this.minQty)
@@ -46,9 +58,9 @@ class TradingBot {
             }
 
             if ( price >= this.startPrice.toFixed(this.minPrice) && this.bought )
-                console.log(`Buying order at ${price} expected to be successful`)
+                console.log(`\x1b[34m${Date.now()} -\x1b[37m Buying order at ${price} expected to be successful`)
             else if ( (price >=  this.limit.stopProfit || price <=  this.limit.stopLoss) && this.sold)
-                console.log(`Selling order at ${price} expected to be successful`)
+                console.log(`\x1b[34m${Date.now()} -\x1b[37m Selling order at ${price} expected to be successful`)
             
         })
     }
@@ -57,7 +69,7 @@ class TradingBot {
         await this.client.exchangeInfo().then(rules => {
             rules.symbols.forEach(async symbol => {
                 if (symbol.symbol == this.coin) {
-                    console.log(symbol.filters);
+                    //console.log(symbol.filters);
                     this.minPrice = this.min_Price(symbol.filters[0].minPrice);
                     this.minQty = this.min_Qty(symbol.filters[2].minQty);
                 }
@@ -85,9 +97,9 @@ class TradingBot {
     }
 
     async setOrder (coin, orderPrice, condition, op, qty = 0, cb) {
-        let message = `Order to ${op} ${coin} has been set at price ${orderPrice}`
+        let message = `\x1b[34m${Date.now()} -\x1b[37m Order to ${op} ${coin} has been set at price ${orderPrice}`
         if (condition) {
-            console.log(message, '-', 'attempt')
+            console.log(message, '-', '\x1b[33mattempt')
             try {
                 await this.client.orderTest({
                     symbol: coin,
@@ -96,16 +108,16 @@ class TradingBot {
                     price: orderPrice,
                 })
                 cb()
-                console.log(message, '-', 'complete')
+                console.log(message, '-', '\x1b[32mcomplete')
             } catch (e) {
-                console.log(message, '-', 'failed reason:', e.message)
+                console.log(message, '-', '\x1b[31mfailed reason:', e.message)
             }
         }
     }
 
     async setOrderOCO (coin, profitPrice, lossPrice , op, qty = 0 , cb ) {
-        let message = `Order to ${op} ${coin} has been set at price ${profitPrice} or ${lossPrice}`
-        console.log(message, '-', 'attempt')
+        let message = `\x1b[34m${Date.now()} -\x1b[37m Order to ${op} ${coin} has been set at price ${profitPrice} or ${lossPrice}`
+        console.log(message, '-', '\x1b[33mattempt')
         try {
             await this.client.orderOco({
                 symbol: coin,
@@ -116,9 +128,9 @@ class TradingBot {
                 stopLimitPrice: lossPrice ,
             })
             cb()
-            console.log(message, '-', 'complete')
+            console.log(message, '-', '\x1b[32mcomplete')
         } catch (e) {
-            console.log(message, '-', 'failed reason:', e.message)
+            console.log(message, '-', '\x1b[31mfailed reason:', e.message)
         }
     }
 
