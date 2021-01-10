@@ -1,26 +1,95 @@
 const Binance = require('binance-api-node').default;
-const redis = require("redis");
-const util = require('util');
 
-let store = redis.createClient();
-store.get = util.promisify(store.get);
-store.set = util.promisify(store.set);
+class TradingBot {
+
+    startPrice = 0
+    bought = false
+    sold = false
+    qty = 0
+    coin = 'BTCUSDT'
+    usd = 50
+    lotSize = 0
+    min = 0
+    limitOptions = {}
+    limits = {}
+
+    constructor(
+        apiKey = 'API-KEY',
+        apiSecret = 'API-KEY'
+    ) {
+        this.client = Binance({
+            apiKey: apiKey ,
+            apiSecret: apiSecret,
+        })
+        this.setLimits()
+    }
+
+    subscribe () {
+        this.client.ws.ticker(this.coin, async ticker => {
+
+            let price = Number.parseFloat(ticker.curDayClose)
 
 
-const client = Binance({
-    apiKey: 'API-KEY',
-    apiSecret: 'API-KEY',
-});
+            if (!this.bought && price > 0) {
+                let qty = ( this.usd / (price * 1.01).toFixed(this.minPrice)  ).toFixed(this.minQty)
+                console.log(qty, this.minQty , this.minPrice)
+                await this.setOrder(this.coin, (price * 1.01).toFixed(this.minPrice), true, "BUY", qty , async () =>{
+                    this.startPrice = price * 1.01
+                    this.bought = true
+                    this.qty = qty
+                    this.updateLimits()
+                })
+            } else if ( !this.sold ) {
+                await this.setOrderOCO(this.coin, this.limit.stopProfit ,  this.limit.stopLoss ,"SELL", this.qty, async () =>{
+                    this.sold = true
+                })
+            }
+
+            if ( price >= this.startPrice.toFixed(this.minPrice) && this.bought )
+                console.log(`Buying order at ${price} expected to be successful`)
+            else if ( (price >=  this.limit.stopProfit || price <=  this.limit.stopLoss) && this.sold)
+                console.log(`Selling order at ${price} expected to be successful`)
+            
+        })
+    }
+
+    async getCoinRules () {
+        await this.client.exchangeInfo().then(rules => {
+            rules.symbols.forEach(async symbol => {
+                if (symbol.symbol == this.coin) {
+                    console.log(symbol.filters);
+                    this.minPrice = this.min_Price(symbol.filters[0].minPrice);
+                    this.minQty = this.min_Qty(symbol.filters[2].minQty);
+                }
+            })
+        })
+    }
 
 
-(async () => {
+    async start(options) {
+        this.coin = options.coin 
+        this.usd = options.usd
+        await this.getCoinRules()
+        this.subscribe()
+    }
 
-    const setOrder = async (coin, orderPrice, condition, op, qty = 0, cb) => {
+
+    min_Qty ( qty ) {
+        qty = qty.split('1')[0]
+        return qty.length == 0 ? 0  : qty.split('.')[1].length
+    }
+
+    min_Price ( price ) {
+        price = price.split('1')[0]
+        return price.length == 0 ? 0 : price.split('.')[1].length
+    }
+
+    async setOrder (coin, orderPrice, condition, op, qty = 0, cb) {
         let message = `Order to ${op} ${coin} has been set at price ${orderPrice}`
         if (condition) {
             console.log(message, '-', 'attempt')
             try {
-                await client.orderTest({
+                await this.client.orderTest({
                     symbol: coin,
                     side: op,
                     quantity: qty,
@@ -34,11 +103,11 @@ const client = Binance({
         }
     }
 
-    const setOrderOCO = async (coin, profitPrice, lossPrice , op, qty = 0 , cb ) => {
+    async setOrderOCO (coin, profitPrice, lossPrice , op, qty = 0 , cb ) {
         let message = `Order to ${op} ${coin} has been set at price ${profitPrice} or ${lossPrice}`
         console.log(message, '-', 'attempt')
         try {
-            await client.orderOco({
+            await this.client.orderOco({
                 symbol: coin,
                 side: op,
                 quantity: qty,
@@ -53,75 +122,26 @@ const client = Binance({
         }
     }
 
-    let coin = 'BNBUSDT'
-    let usd = 50
+    setLimits(options = { loss: 0.02 , profit: 0.5 }) {
+        this.limitOptions = options 
+        this.updateLimits()
+    }
 
-    await store.set("startPrice", 0);
-    await store.set("bought", false);
-    await store.set("sold", false);
-    await store.set("qty", 0);
+    updateLimits () {
+        this.limit = {
+            stopLoss: (this.startPrice - (this.startPrice *  this.limitOptions.loss )).toFixed(this.minPrice) ,
+            stopProfit: (this.startPrice * ( this.limitOptions.profit + 1 )).toFixed(this.minPrice)
+        }
+    }
 
-    await client.exchangeInfo().then(rules => {
-        rules.symbols.forEach(async symbol => {
-            if (symbol.symbol == coin) {
-                console.log(symbol.filters);
-                await store.set("precision", symbol.baseAssetPrecision);
-                await store.set("lotSize", symbol.filters[2].minQty);
-                await store.set("min", Number.parseFloat(symbol.filters[0].minPrice).toString());
-            }
-        })
-    })
+}
 
-    
-    client.ws.ticker(coin, async ticker => {
 
-        Promise.all([
-            store.get("bought"),
-            store.get("startPrice"),
-            store.get("precision"),
-            store.get("min"),
-            store.get("sold"),
-            store.get("qty"),
-            store.get("lotSize")
-        ]).then(async (values) => {
+( async () => {
 
-            let bought = values[0] === "true"
-            let sold = values[4] === "true"
-            let startPrice = Number.parseFloat(values[1])
-            let qty = Number.parseFloat(values[5])
-            let precision = Number.parseInt(values[2]) - 4
-            let minPrice = values[3].split('.')[1].length
-            let minQty = (values[6].split('.')[1]).split('1')[0].length
-            let price = Number.parseFloat(ticker.curDayClose)
-            
-            let limit = {
-                stopLoss: (startPrice - (startPrice * 0.02)).toFixed(minPrice) ,
-                stopProfit: (startPrice * 1.51).toFixed(minPrice)
-            }
-            
-            if (!bought && price > 0) {
-                qty = (usd / (price * 1.01).toFixed(minPrice)  ).toFixed(minQty)
-                console.log(qty)
-                await setOrder(coin, (price * 1.01).toFixed(minPrice), true, "BUY", qty , async () =>{
-                    await store.set("startPrice", price * 1.01);
-                    await store.set("bought", true);
-                    await store.set("qty", qty);
-                })
-            } else if ( !sold ) {
-                await setOrderOCO(coin, limit.stopProfit , limit.stopLoss ,"SELL", qty, async () =>{
-                    await store.set("sold", true);
-                })
-            }
+    let bot = new TradingBot()
+    bot.setLimits({ loss: 0.02 , profit: 0.5 })
+    await bot.start({ coin : 'BNBUSDT' , usd : 50 })
 
-            if ( price >= startPrice.toFixed(minPrice) && bought )
-                console.log(`Buying order at ${price} expected to be successful`)
-            else if ( (price >= limit.stopProfit || price <= limit.stopLoss) && sold)
-                console.log(`Selling order at ${price} expected to be successful`)
+})()
 
-        }).catch(error => {
-            console.log(error.message)
-        })
-
-    })
-
-})();
