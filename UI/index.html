@@ -1,0 +1,38 @@
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title> Coin Catcher </title>
+    <meta http-equiv="Content-Security-Policy" content="default-src * self blob: data: gap:; style-src * self 'unsafe-inline' blob: data: gap:; script-src * 'self' 'unsafe-eval' 'unsafe-inline' blob: data: gap:; object-src * 'self' blob: data: gap:; img-src * self 'unsafe-inline' blob: data: gap:; connect-src self * 'unsafe-inline' blob: data: gap:; frame-src * self blob: data: gap:;">
+    <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@mdi/font@4.x/css/materialdesignicons.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
+    <link href="./index.css" rel="stylesheet">
+</head>
+<body style="background: #263238;">
+    <div id="app">
+        <v-app color="#263238">
+          <v-main color="transparent" class="pa-2">
+            <v-app-bar class="rounded mb-2 px-2" color="blue-grey darken-3" flat dense >
+                <v-spacer></v-spacer>
+                <v-btn small icon fab dark ><v-icon dark > mdi-minus </v-icon></v-btn>
+                <v-btn small icon fab dark @click="close()" ><v-icon dark > mdi-close </v-icon></v-btn>
+            </v-app-bar>
+            <v-card max-width="400" flat class="pa-2" color="blue-grey darken-3">
+                <v-text-field :disabled="stop" label="The coin tag" color="blue-grey lighten-1" v-model="coin" dense filled ></v-text-field>
+                <v-text-field type="number" :disabled="stop" prefix="$" label="The amount of USDT" color="blue-grey lighten-1" dense v-model="usd" filled ></v-text-field>
+            </v-card>
+            <v-card max-width="400" flat class="pa-2 my-2" color="blue-grey darken-3">
+                <v-text-field type="number" :disabled="stop" suffix="%" label="Threshold" color="blue-grey lighten-1" v-model="coin" dense filled ></v-text-field>
+                <v-text-field type="number" :disabled="stop" suffix="%" label="Loss Percentage" color="blue-grey lighten-1" v-model="coin" dense filled ></v-text-field>
+                <v-text-field type="number" :disabled="stop" suffix="%" label="Profit Percentage" color="blue-grey lighten-1" dense v-model="usd" filled ></v-text-field>
+                <v-divider class="ma-2"></v-divider>   
+                <v-btn  @click="start()" color='blue-grey lighten-1'> {{ !stop ? 'Start' : 'Stop' }} </v-btn>
+            </v-card>
+          </v-main>
+        </v-app>
+      </div>
+</body>
+<script src="https://cdn.jsdelivr.net/npm/vue@2.6.12"></script>
+<script src="https://cdn.jsdelivr.net/npm/vuetify@2.4/dist/vuetify.js"></script>
+<script src="./app.js"></script>
+</html>

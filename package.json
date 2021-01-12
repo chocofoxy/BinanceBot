@@ -2,14 +2,18 @@
   "name": "binance",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "electron .",
+    "launch": "node index.js"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "binance-api-node": "^0.10.18",
     "redis": "^3.0.2"
+  },
+  "devDependencies": {
+    "electron": "^11.1.1"
   }
 }
